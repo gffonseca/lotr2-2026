@@ -1,0 +1,31 @@
+{
+  "name": "lotr2-2026",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lords of the Realm II — 2026: remake fiel modernizado (Web/TypeScript + PixiJS).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "tsx server/index.ts"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pixi.js": "^8.2.6",
+    "tsx": "^4.16.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
