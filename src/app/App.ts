@@ -123,7 +123,7 @@ export class App {
         .card h3,.panel h3{color:#6b3f14;font-weight:700;letter-spacing:.5px}
         .card b,.panel b,.mcard h2{color:#5a3410}
         .overlay{pointer-events:auto;position:fixed;inset:68px 10px 10px;overflow:auto}
-        .side{position:fixed;top:74px;right:10px;width:308px;pointer-events:auto}
+        .side{position:fixed;top:118px;right:10px;width:300px;pointer-events:auto}
         .card{padding:10px;margin-bottom:10px;font-size:13px}
         .panel{padding:14px;max-width:860px;margin:0 auto}
         .row{display:grid;grid-template-columns:80px 1fr 34px;gap:6px;align-items:center;margin:4px 0}
