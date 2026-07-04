@@ -31,6 +31,13 @@ describe("Fase 2 — máquinas de cerco", () => {
     expect(sim.breaches.length).toBeGreaterThan(0);
   });
 
+  it("torre de cerco cruza a muralha e abre passagem", () => {
+    const sim = new BattleSim({ ...base, attacker: T({ sword: 1 }), defender: T({ pike: 1 }), siege: { towers: 1 } });
+    expect(sim.breaches.length).toBe(0);
+    run(sim, 30);
+    expect(sim.breaches.length).toBeGreaterThan(0);
+  });
+
   it("óleo fervente fere atacantes colados no portão", () => {
     const sim = new BattleSim({ ...base, attacker: T({ sword: 3 }), defender: T({ pike: 1 }), boilingOil: true });
     sim.units.filter((u) => u.team === "blue").slice(0, 3).forEach((u, i) => {

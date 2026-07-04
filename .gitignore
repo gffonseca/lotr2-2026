@@ -4,6 +4,7 @@ dist-server/
 distbuild/
 b_*/
 build_*/
+d_*/
 *.timestamp-*.mjs
 *.log
 .DS_Store

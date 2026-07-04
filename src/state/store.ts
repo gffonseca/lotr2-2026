@@ -7,7 +7,8 @@ import {
   Rng, createKingdom, adjacency, autoResolve, moveTroops, collectIncome,
   resetMoves, runRivalTurn, checkVictory, troopCount, emptyTroops,
   createCountyEconomy, tickCounty, EDGES, tickEconomy, developFarm, strategicIncome, COUNTY_ECON,
-  type Kingdom, type County, type Troops, type Screen, type CountyEconomy,
+  LORDS, PERSONALITIES, evaluateTruce, truceCost, TRUCE_TURNS, factionPower,
+  type Kingdom, type County, type Troops, type Screen, type CountyEconomy, type Personality,
 } from "@/domain";
 import { serialize, deserialize, SAVE_KEY, type CampaignSnapshot } from "./persistence";
 
@@ -32,6 +33,8 @@ export class GameStore {
   selectedCounty: number | null = null;
   campaignLog: LogLine[] = [];
   campaignWinner: "blue" | "red" | null = null;
+  rivalPersonality: Personality = "knight";
+  truceTurns = 0;
 
   // --- economia (modo condado) ---
   economy: CountyEconomy;
@@ -46,9 +49,14 @@ export class GameStore {
   constructor(seed: number = Date.now() >>> 0) {
     this.rng = new Rng(seed);
     this.kingdom = createKingdom(this.rng);
+    this.rivalPersonality = this.rng.pick(PERSONALITIES);
     this.economy = createCountyEconomy();
-    this.log(["Você governa Millbrook; o rival, Greystone. Conquiste todos os condados."], "info");
+    const lord = LORDS[this.rivalPersonality];
+    this.log([`Você governa Millbrook. Seu rival é ${lord.name}, ${lord.epithet}. Conquiste todos os condados.`], "info");
   }
+
+  rivalLord() { return LORDS[this.rivalPersonality]; }
+  truceCostNow(): number { return truceCost(factionPower(this.kingdom, "red")); }
 
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
@@ -66,11 +74,34 @@ export class GameStore {
   // ---------------- CAMPANHA ----------------
   newCampaign(): void {
     this.kingdom = createKingdom(this.rng);
+    this.rivalPersonality = this.rng.pick(PERSONALITIES);
+    this.truceTurns = 0;
     this.campaignGold = 200; this.campaignYear = 1;
     this.selectedCounty = null; this.campaignLog = []; this.campaignWinner = null;
-    this.log(["Nova campanha. Expanda com sabedoria."], "info");
+    const lord = LORDS[this.rivalPersonality];
+    this.log([`Nova campanha. Rival: ${lord.name}, ${lord.epithet}.`], "info");
     this.saveCampaign();
     this.emit();
+  }
+
+  /** Propõe trégua ao rival (paga tributo se aceito). */
+  proposeTruce(): { ok: boolean; accept: boolean; reason: string; cost: number } {
+    if (this.campaignWinner) return { ok: false, accept: false, reason: "A guerra acabou.", cost: 0 };
+    const profile = LORDS[this.rivalPersonality];
+    const rivalPower = factionPower(this.kingdom, "red");
+    const playerPower = factionPower(this.kingdom, "blue");
+    const cost = truceCost(rivalPower);
+    if (this.campaignGold < cost) return { ok: false, accept: false, reason: `Tributo custa ${cost}🪙 — ouro insuficiente.`, cost };
+    const res = evaluateTruce(profile, { tribute: cost, playerPower, rivalPower });
+    if (res.accept) {
+      this.campaignGold -= cost;
+      this.truceTurns = TRUCE_TURNS;
+      this.log([`🕊️ ${profile.name}: ${res.reason} (${TRUCE_TURNS} turnos, −${cost}🪙)`], "win");
+    } else {
+      this.log([`✋ ${profile.name}: ${res.reason}`], "lose");
+    }
+    this.saveCampaign(); this.emit();
+    return { ok: true, accept: res.accept, reason: res.reason, cost };
   }
 
   neighbors(id: number): number[] { return adjacency(this.kingdom.edges, id); }
@@ -164,7 +195,9 @@ export class GameStore {
     this.campaignGold += inc;
     resetMoves(this.kingdom);
     this.log([`— Fim do turno. Renda +${inc} moedas —`], "info");
-    for (const ev of runRivalTurn(this.kingdom, this.rng)) this.log([ev.text], ev.kind);
+    const truceActive = this.truceTurns > 0;
+    for (const ev of runRivalTurn(this.kingdom, this.rng, LORDS[this.rivalPersonality], truceActive)) this.log([ev.text], ev.kind);
+    if (this.truceTurns > 0) { this.truceTurns--; if (this.truceTurns === 0) this.log(["A trégua expirou."], "info"); }
     this.campaignYear++; this.selectedCounty = null;
     this.checkVictory(); this.saveCampaign(); this.emit();
   }
@@ -177,7 +210,7 @@ export class GameStore {
   // ---------------- SAVE / LOAD (M3) ----------------
   private snapshot(): CampaignSnapshot {
     return {
-      version: 2,
+      version: 3,
       gold: this.campaignGold,
       year: this.campaignYear,
       counties: this.kingdom.counties,
@@ -185,6 +218,8 @@ export class GameStore {
       winner: this.campaignWinner,
       log: this.campaignLog,
       rngState: this.rng.snapshot(),
+      rivalPersonality: this.rivalPersonality,
+      truceTurns: this.truceTurns,
     };
   }
 
@@ -209,6 +244,8 @@ export class GameStore {
     this.campaignWinner = snap.winner;
     this.campaignLog = snap.log;
     this.rng.restore(snap.rngState);
+    this.rivalPersonality = (PERSONALITIES as string[]).includes(snap.rivalPersonality) ? (snap.rivalPersonality as Personality) : "knight";
+    this.truceTurns = snap.truceTurns;
     this.log(["Campanha carregada."], "info");
     this.emit();
     return true;

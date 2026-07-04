@@ -32,8 +32,8 @@ export interface Gate { x: number; y: number; w: number; h: number; hp: number; 
 /** Evento cosmético de um passo (consumido pelo render p/ som e partículas). */
 export interface SimEvent { type: "hit" | "shot" | "gate" | "death" | "lob" | "breach" | "oil"; x: number; y: number; }
 
-/** Máquinas de cerco do atacante (Fase 2). */
-export type SiegeKind = "catapult" | "ram" | "sapper";
+/** Máquinas de cerco do atacante (Fase 2/3). */
+export type SiegeKind = "catapult" | "ram" | "sapper" | "tower";
 export interface SiegeEngine {
   id: number; kind: SiegeKind; x: number; y: number; hp: number; maxHp: number;
   cd: number; progress: number; done: boolean;
@@ -43,7 +43,7 @@ export interface Lob { sx: number; sy: number; x: number; y: number; tx: number;
 /** Brecha na muralha (aberta por sapador). */
 export interface Breach { y: number; halfH: number; }
 
-export interface SiegeLoadout { catapults?: number; rams?: number; sappers?: number; }
+export interface SiegeLoadout { catapults?: number; rams?: number; sappers?: number; towers?: number; }
 
 export interface BattleConfig {
   attacker: Troops;
@@ -60,10 +60,13 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
 
 /** Coeficientes das máquinas de cerco e do óleo (Fase 2). */
 export const SIEGE = {
-  catapult: { hp: 120, cd: 3.2, speed: 34, range: 420, splash: 55, dmgGate: 60, dmgUnit: 34 },
-  ram: { hp: 260, cd: 0.9, speed: 72, dmgGate: 55 },
-  sapper: { hp: 90, speed: 58, sapTime: 9, breachHalfH: 60 },
-  oil: { cd: 6, radius: 72, dmg: 45, charges: 3 },
+  // balanceamento afinado: portão dura mais, catapulta menos brutal, aríete decisivo mas não instantâneo
+  catapult: { hp: 120, cd: 3.6, speed: 34, range: 420, splash: 48, dmgGate: 48, dmgUnit: 28 },
+  ram: { hp: 280, cd: 1.0, speed: 66, dmgGate: 46 },
+  sapper: { hp: 90, speed: 58, sapTime: 8, breachHalfH: 60 },
+  tower: { hp: 240, speed: 40, breachHalfH: 72 }, // cruza a muralha e abre passagem ampla no topo
+  oil: { cd: 5.5, radius: 74, dmg: 42, charges: 3 },
+  gateHp: 720, // portão mais resistente (era 600)
 } as const;
 
 export class BattleSim {
@@ -95,7 +98,7 @@ export class BattleSim {
     this.wallX = cfg.width - 150;
     this.gate = {
       x: this.wallX, y: cfg.height / 2, w: 26, h: 120,
-      hp: cfg.fortified ? 600 : 0, maxHp: cfg.fortified ? 600 : 1,
+      hp: cfg.fortified ? SIEGE.gateHp : 0, maxHp: cfg.fortified ? SIEGE.gateHp : 1,
     };
     this.deploy(cfg.attacker, "blue", 90);
     this.deploy(cfg.defender, "red", cfg.fortified ? this.wallX - 90 : this.wallX - 40);
@@ -114,10 +117,11 @@ export class BattleSim {
         y += 95; if (y > this.height - 60) y = 150;
       }
     };
-    // catapulta já entra dentro do alcance; aríete e sapador partem da retaguarda
+    // catapulta já entra dentro do alcance; aríete/sapador/torre partem da retaguarda
     place("catapult", loadout.catapults ?? 0, this.wallX - SIEGE.catapult.range + 40);
     place("ram", loadout.rams ?? 0, 150);
     place("sapper", loadout.sappers ?? 0, 150);
+    place("tower", loadout.towers ?? 0, 130);
   }
 
   private deploy(troops: Troops, team: Faction, x0: number): void {
@@ -385,7 +389,7 @@ export class BattleSim {
           this.events.push({ type: "gate", x: this.gate.x, y: ty });
           s.cd = SIEGE.ram.cd;
         }
-      } else { // sapper
+      } else if (s.kind === "sapper") {
         if (s.done) continue;
         const targetY = Math.max(70, this.gate.y - 170);
         if (!this.moveEngine(s, this.wallX - 18, targetY, SIEGE.sapper.speed, dt)) continue;
@@ -395,6 +399,13 @@ export class BattleSim {
           s.done = true;
           this.events.push({ type: "breach", x: this.wallX, y: targetY });
         }
+      } else { // tower — cruza a muralha e abre passagem ampla ao encostar (sem escavar)
+        if (s.done) continue;
+        const targetY = Math.min(this.height - 90, this.gate.y + 170);
+        if (!this.moveEngine(s, this.wallX - 16, targetY, SIEGE.tower.speed, dt)) continue;
+        this.breaches.push({ y: targetY, halfH: SIEGE.tower.breachHalfH / 2 });
+        s.done = true;
+        this.events.push({ type: "breach", x: this.wallX, y: targetY });
       }
     }
   }

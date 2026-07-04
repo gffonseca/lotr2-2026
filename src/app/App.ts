@@ -61,7 +61,7 @@ export class App {
   private startBattle(): void {
     const pb = this.store.pendingBattle;
     const seed = Date.now() >>> 0;
-    const siege = { catapults: 1, rams: 1, sappers: 1 };
+    const siege = { catapults: 1, rams: 1, sappers: 1, towers: 1 };
     const cfg: BattleConfig = pb
       ? { attacker: { ...pb.attacker }, defender: { ...pb.defender }, fortified: pb.fortified, width: BATTLE_W, height: BATTLE_H, seed,
           siege: pb.fortified ? siege : undefined, boilingOil: pb.fortified }
@@ -148,7 +148,8 @@ export class App {
         <div class="stat"><div class="k">Tesouro</div><div class="v" id="cmp-gold" style="color:#d9b25a">200</div></div>
         <div class="stat"><div class="k">Condados</div><div class="v" id="cmp-cty" style="color:#4f7fd0">2</div></div>
         <div class="grow"></div>
-        <span class="info" id="cmp-saved" style="font-size:11px">salvo ✓</span>
+        <span class="info" id="cmp-rival" style="font-size:11px"></span>
+        <button class="btn" id="cmp-diplo">🕊️ Diplomacia</button>
         <button class="btn" id="cmp-restart">↺ Reiniciar</button>
         <button class="btn primary" id="cmp-end">Encerrar turno ▸</button>
       </div>
@@ -180,6 +181,7 @@ export class App {
       (b as HTMLElement).addEventListener("click", () => this.show((b as HTMLElement).dataset.go as Screen)));
     this.el("cmp-end").addEventListener("click", () => this.store.campaignEndTurn());
     this.el("cmp-restart").addEventListener("click", () => this.store.newCampaign());
+    this.el("cmp-diplo").addEventListener("click", () => this.diplomacy());
     this.el("menu-continue").addEventListener("click", () => { if (this.store.loadCampaign()) this.show("campaign"); });
     this.el("bat-pause").addEventListener("click", () => { this.battle.paused = !this.battle.paused; this.el("bat-pause").textContent = this.battle.paused ? "▶" : "⏸"; });
     this.el("bat-restart").addEventListener("click", () => { this.store.pendingBattle = null; this.startBattle(); });
@@ -223,6 +225,8 @@ export class App {
     this.setText("cmp-year", String(this.store.campaignYear));
     this.setText("cmp-gold", String(this.store.campaignGold));
     this.setText("cmp-cty", String(this.store.ownedCount()));
+    const lord = this.store.rivalLord();
+    this.setText("cmp-rival", `${lord.name} · ${this.store.truceTurns > 0 ? `trégua ${this.store.truceTurns}t` : "em guerra"}`);
     this.el("cmp-log").innerHTML = this.store.campaignLog.map((l) => `<div class="${l.kind}">${l.text}</div>`).join("");
     // painel do condado selecionado
     const sel = this.store.selectedCounty;
@@ -301,9 +305,22 @@ export class App {
   private el(id: string): HTMLElement { return document.getElementById(id) as HTMLElement; }
   private setText(id: string, v: string): void { const e = document.getElementById(id); if (e) e.textContent = v; }
   private toggle(id: string, on: boolean): void { const e = document.getElementById(id); if (e) e.style.display = on ? "" : "none"; }
-  private modal(title: string, actions: Array<[string, () => void]>): void {
+  private diplomacy(): void {
+    const lord = this.store.rivalLord();
+    const cost = this.store.truceCostNow();
+    const truce = this.store.truceTurns;
+    const status = truce > 0
+      ? `Trégua ativa por mais ${truce} turno(s).`
+      : `${lord.name}, ${lord.epithet}. Um tributo pode comprar alguns turnos de paz — mas ele decide conforme seu temperamento e sua força.`;
+    this.modal(`Diplomacia com ${lord.name}`, [
+      [`Propor trégua (tributo ${cost}🪙)`, () => { const r = this.store.proposeTruce(); this.closeModal(); this.toast(r.accept ? "🕊️ Trégua aceita!" : "✋ " + r.reason); }],
+      ["Fechar", () => this.closeModal()],
+    ], status);
+  }
+
+  private modal(title: string, actions: Array<[string, () => void]>, subtitle?: string): void {
     const box = this.el("modal-box");
-    box.innerHTML = `<h3>${title}</h3>`;
+    box.innerHTML = `<h3>${title}</h3>` + (subtitle ? `<div class="info" style="margin:6px 0 4px;max-width:340px">${subtitle}</div>` : "");
     for (const [label, fn] of actions) {
       const b = document.createElement("button"); b.className = "btn primary"; b.style.margin = "6px"; b.textContent = label;
       b.addEventListener("click", fn); box.appendChild(b);

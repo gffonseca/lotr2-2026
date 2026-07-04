@@ -173,9 +173,13 @@ export class BattleRenderer {
         this.bg.rect(s.x - 16, s.y - 6, 32, 12).fill(0x5a3d22).stroke({ width: 1, color: 0x2a1c10 });
         this.bg.circle(s.x + 16, s.y, 5).fill(0x9a9a9a);
         this.sglyph("A", s.x - 2, s.y + 1);
-      } else {
+      } else if (s.kind === "sapper") {
         this.bg.circle(s.x, s.y, 9).fill(0x7a6a4a).stroke({ width: 1, color: 0x2a1c10 });
         this.sglyph("S", s.x, s.y + 1);
+      } else { // tower
+        this.bg.rect(s.x - 11, s.y - 22, 22, 44).fill(0x5a4326).stroke({ width: 1, color: 0x2a1c10 });
+        this.bg.rect(s.x - 11, s.y - 22, 22, 8).fill(0x74582f);
+        this.sglyph("T", s.x, s.y - 1);
       }
     }
 

@@ -14,6 +14,8 @@ function makeSnapshot(): CampaignSnapshot {
     winner: null,
     log: [{ text: "⚔ Ashford tomado!", kind: "win" }],
     rngState: rng.snapshot(),
+    rivalPersonality: "baron",
+    truceTurns: 2,
   };
 }
 

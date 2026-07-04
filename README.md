@@ -178,8 +178,9 @@ o escopo completo do jogo. Esta base (este repo) já cobre M0–M2.
 
 ## Roadmap de engenharia (além da Fase 1)
 
-- ✅ **Fase 2 — Combate completo (primeira leva):** catapultas (arco + área), aríete, sapadores que abrem **brechas** na muralha, **óleo fervente** do defensor, **formações** (linha/coluna/cunha) e **pathfinding** até o vão. Animação de sprites **8-direcional** (mapeamento ajustável em `render/sprites.ts`).
-- **Fase 3 — IA e diplomacia:** IA estratégica (avaliação de fronteiras, blefe), personalidades (Cavaleiro/Condessa/Bispo/Barão), mensagens/gifts.
+- ✅ **Fase 2 — Combate de cerco:** catapultas (arco + área), aríete, sapadores (brechas), **torres de cerco** que cruzam a muralha, **óleo fervente** do defensor, **formações** (linha/coluna/cunha) e **pathfinding** até o vão. Animação de sprites **8-direcional** (mapeamento ajustável em `render/sprites.ts`).
+- ✅ **Fase 3 (primeira leva) — Diplomacia & IA:** lordes rivais com **personalidades** (Barão/Cavaleiro/Condessa/Bispo), **trégua** por tributo (aceitação conforme temperamento e força), e **IA estratégica** mais esperta (valorização de alvos, consolidação de tropas, ataque só com vantagem, respeito à trégua).
+- 🔶 **Fase 3 — IA e diplomacia (em curso):** feito personalidades (Cavaleiro/Condessa/Bispo/Barão), trégua por tributo e IA com valorização de alvos/consolidação; a fazer: alianças, blefe, múltiplos lordes no mapa.
 - **Fase 4 — Multiplayer assíncrono:** mover a simulação determinística para autoridade no servidor (Laravel/Node), turnos por partida, contas e saves na nuvem, replays a partir do log de comandos + seed.
 - **Fase 5 — Conteúdo & meta:** editor de mapas, campanhas históricas, balanceamento data-driven, telemetria.
 

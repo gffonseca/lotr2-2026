@@ -4,7 +4,7 @@
  */
 import type { County } from "@/domain";
 
-export const SAVE_VERSION = 2; // v2: County ganhou campos econômicos (M4)
+export const SAVE_VERSION = 3; // v3: diplomacia (personalidade do rival + trégua)
 export const SAVE_KEY = "lotr2-2026:campaign";
 
 export interface LogLineSnapshot { text: string; kind: "info" | "win" | "lose"; }
@@ -18,6 +18,8 @@ export interface CampaignSnapshot {
   winner: "blue" | "red" | null;
   log: LogLineSnapshot[];
   rngState: number;
+  rivalPersonality: string;
+  truceTurns: number;
 }
 
 export function serialize(snap: CampaignSnapshot): string {
@@ -41,6 +43,8 @@ export function deserialize(json: string): CampaignSnapshot | null {
       winner: data.winner ?? null,
       log: Array.isArray(data.log) ? (data.log as LogLineSnapshot[]) : [],
       rngState: data.rngState,
+      rivalPersonality: typeof data.rivalPersonality === "string" ? data.rivalPersonality : "knight",
+      truceTurns: typeof data.truceTurns === "number" ? data.truceTurns : 0,
     };
   } catch {
     return null;
