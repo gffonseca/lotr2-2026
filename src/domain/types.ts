@@ -6,7 +6,10 @@
 export type UnitType = "sword" | "pike" | "archer" | "knight" | "mace";
 export const UNIT_TYPES: readonly UnitType[] = ["sword", "pike", "archer", "knight", "mace"] as const;
 
-export type Faction = "blue" | "red" | "neutral";
+export type Faction = "blue" | "red" | "green" | "neutral";
+/** Facções controladas pela IA (lordes rivais). */
+export const AI_FACTIONS = ["red", "green"] as const;
+export type AiFaction = (typeof AI_FACTIONS)[number];
 
 /** Quantidade de cada tipo de unidade numa companhia/exército. */
 export type Troops = Record<UnitType, number>;

@@ -1,9 +1,12 @@
 /**
  * Diplomacia e personalidades dos lordes rivais (Fase 3).
- * Determinístico e puro — a aceitação de trégua depende de personalidade,
- * força relativa e tributo, sem RNG (testável).
+ * Determinístico e puro — aceitação depende de personalidade, força e tributo.
  */
+import type { AiFaction } from "../types";
+
 export type Personality = "baron" | "knight" | "countess" | "bishop";
+/** Relação do jogador com um lorde. */
+export type RelationState = "war" | "truce" | "alliance";
 
 export interface LordProfile {
   id: Personality;
@@ -48,3 +51,28 @@ export function evaluateTruce(p: LordProfile, o: TruceOffer): TruceResult {
       : "Ele não vê motivo para uma trégua agora.";
   return { accept, reason };
 }
+
+// ------------------- Aliança (mais difícil que trégua) -------------------
+export const ALLIANCE_TURNS = 8;
+export function allianceCost(lordPower: number): number { return Math.max(120, Math.round(lordPower * 1.8)); }
+
+export function evaluateAlliance(p: LordProfile, o: TruceOffer): TruceResult {
+  const ratio = o.playerPower / (o.rivalPower || 1);
+  const fear = Math.max(0, Math.min(1, ratio - 1));
+  const bribe = Math.min(0.4, o.tribute / 700);
+  const score = p.truceBias * 0.45 + fear * 0.4 + bribe;
+  const accept = score >= 0.6;
+  return {
+    accept,
+    reason: accept ? "Ele sela uma aliança convosco." : "Ele não confia o bastante para uma aliança.",
+  };
+}
+
+// ------------------- Demanda / blefe -------------------
+export const DEMAND_TRUCE_TURNS = 3;
+export interface Demand { faction: AiFaction; lordName: string; tribute: number; willFollowThrough: boolean; }
+
+/** Chance de um lorde emitir uma demanda num turno (maior se agressivo). */
+export function demandChance(p: LordProfile): number { return 0.10 + p.aggression * 0.10; }
+/** Chance de a ameaça ser real (agressivo cumpre; cauteloso blefa). */
+export function demandFollowThrough(p: LordProfile): number { return Math.min(0.9, Math.max(0.1, p.aggression * 0.6)); }

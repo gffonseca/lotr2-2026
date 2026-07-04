@@ -259,8 +259,14 @@ export class App {
     this.setText("cmp-year", String(this.store.campaignYear));
     this.setText("cmp-gold", String(this.store.campaignGold));
     this.setText("cmp-cty", String(this.store.ownedCount()));
-    const lord = this.store.rivalLord();
-    this.setText("cmp-rival", `${lord.name} · ${this.store.truceTurns > 0 ? `trégua ${this.store.truceTurns}t` : "em guerra"}`);
+    const rel = (f: "red" | "green"): string => {
+      if (!this.store.aiFactionsAlive().includes(f)) return "eliminado";
+      const r = this.store.relations[f], t = this.store.truceTurns[f];
+      return r === "war" ? "guerra" : r === "truce" ? `trégua ${t}t` : `aliança ${t}t`;
+    };
+    const rn = this.store.lordProfile("red").name.split(" ").pop();
+    const gn = this.store.lordProfile("green").name.split(" ").pop();
+    this.setText("cmp-rival", `🔴 ${rn}: ${rel("red")} · 🟢 ${gn}: ${rel("green")}`);
     this.el("cmp-log").innerHTML = this.store.campaignLog.map((l) => `<div class="${l.kind}">${l.text}</div>`).join("");
     // painel do condado selecionado
     const sel = this.store.selectedCounty;
@@ -289,7 +295,17 @@ export class App {
         (b as HTMLElement).addEventListener("click", () => { if (!this.store.investFarm(sel)) this.toast("Ouro insuficiente"); }));
     }
     this.map.redraw();
-    if (this.store.campaignWinner) this.banner(this.store.campaignWinner === "blue" ? "👑 O Reino é seu!" : "☠ Seu reino caiu", this.store.campaignWinner === "blue", () => this.store.newCampaign());
+    if (this.store.pendingDemand && this.el("modal").style.display !== "flex") this.showDemand();
+    else if (this.store.campaignWinner) this.banner(this.store.campaignWinner === "win" ? "👑 O Reino é seu!" : "☠ Seu reino caiu", this.store.campaignWinner === "win", () => this.store.newCampaign());
+  }
+
+  private showDemand(): void {
+    const d = this.store.pendingDemand;
+    if (!d) return;
+    this.modal(`✉ Demanda de ${d.lordName}`, [
+      [`Pagar tributo (${d.tribute}🪙)`, () => { this.store.respondDemand(true); this.closeModal(); }],
+      ["Recusar (arriscar a guerra)", () => { this.store.respondDemand(false); this.closeModal(); }],
+    ], `${d.lordName} exige ${d.tribute}🪙 de tributo ou promete guerra. Pode ser blefe — só a coragem (e a personalidade dele) dirá.`);
   }
 
   // ---------------- ECONOMIA (DOM) ----------------
@@ -340,16 +356,24 @@ export class App {
   private setText(id: string, v: string): void { const e = document.getElementById(id); if (e) e.textContent = v; }
   private toggle(id: string, on: boolean): void { const e = document.getElementById(id); if (e) e.style.display = on ? "" : "none"; }
   private diplomacy(): void {
-    const lord = this.store.rivalLord();
-    const cost = this.store.truceCostNow();
-    const truce = this.store.truceTurns;
-    const status = truce > 0
-      ? `Trégua ativa por mais ${truce} turno(s).`
-      : `${lord.name}, ${lord.epithet}. Um tributo pode comprar alguns turnos de paz — mas ele decide conforme seu temperamento e sua força.`;
-    this.modal(`Diplomacia com ${lord.name}`, [
-      [`Propor trégua (tributo ${cost}🪙)`, () => { const r = this.store.proposeTruce(); this.closeModal(); this.toast(r.accept ? "🕊️ Trégua aceita!" : "✋ " + r.reason); }],
-      ["Fechar", () => this.closeModal()],
-    ], status);
+    const alive = this.store.aiFactionsAlive();
+    const actions: Array<[string, () => void]> = [];
+    for (const f of ["red", "green"] as const) {
+      if (!alive.includes(f)) continue;
+      const p = this.store.lordProfile(f);
+      const rel = this.store.relations[f];
+      const tag = f === "red" ? "🔴" : "🟢";
+      if (rel !== "alliance") {
+        actions.push([`${tag} Trégua c/ ${p.name.split(" ").pop()} (${this.store.truceCostNow(f)}🪙)`,
+          () => { const r = this.store.proposeTruce(f); this.closeModal(); this.toast(r.accept ? "🕊️ Trégua aceita!" : "✋ " + r.reason); }]);
+        actions.push([`${tag} Aliança c/ ${p.name.split(" ").pop()} (${this.store.allianceCostNow(f)}🪙)`,
+          () => { const r = this.store.proposeAlliance(f); this.closeModal(); this.toast(r.accept ? "🤝 Aliança selada!" : "✋ " + r.reason); }]);
+      }
+    }
+    actions.push(["Fechar", () => this.closeModal()]);
+    const r = this.store.lordProfile("red"), g = this.store.lordProfile("green");
+    this.modal("Conselho de Diplomacia", actions,
+      `Dois lordes rivais disputam o reino: ${r.name} (${r.epithet}) e ${g.name} (${g.epithet}). Trégua compra paz temporária; aliança impede ataques mútuos por mais tempo. Cada um decide conforme seu temperamento e sua força.`);
   }
 
   private modal(title: string, actions: Array<[string, () => void]>, subtitle?: string): void {

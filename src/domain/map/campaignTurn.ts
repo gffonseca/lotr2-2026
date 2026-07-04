@@ -2,7 +2,7 @@
  * Regras do turno da campanha: renda do jogador, turno da IA rival, condição de vitória.
  * Puro/determinístico dado o RNG.
  */
-import type { Kingdom, County, Faction, UnitType } from "../types";
+import type { Kingdom, County, Faction, UnitType, AiFaction } from "../types";
 import { troopCount, emptyTroops, UNIT_TYPES } from "../types";
 import { UNITS } from "../units";
 import { autoResolve } from "../combat/autoResolve";
@@ -43,20 +43,22 @@ function moveHalf(src: County, dst: County): void {
 }
 
 /**
- * Turno da IA rival (Fase 3) — mais esperta:
- * recruta conforme personalidade, consolida tropas do interior para a fronteira,
- * valoriza alvos (prosperidade/renda + peso do jogador) e só ataca com vantagem
- * (maior contra fortificados; menor se agressivo). Respeita a trégua com o jogador.
+ * Turno de um lorde da IA (Fase 3 profunda) — genérico por facção.
+ * Recruta conforme personalidade, consolida tropas, valoriza alvos e só ataca
+ * com vantagem. `friendly` = facções que este lorde NÃO ataca (ele mesmo, mais
+ * o jogador se houver trégua/aliança). Os lordes atacam-se entre si (IA vs IA).
  */
-export function runRivalTurn(kingdom: Kingdom, rng: Rng, profile: LordProfile, truceActive: boolean): CampaignEvent[] {
+export function runLordTurn(
+  kingdom: Kingdom, rng: Rng, self: AiFaction, profile: LordProfile, friendly: ReadonlySet<Faction>,
+): CampaignEvent[] {
   const events: CampaignEvent[] = [];
-  const reds = kingdom.counties.filter((c) => c.owner === "red");
-  if (reds.length === 0) return events;
-  const gold = reds.reduce((s, c) => s + c.income, 0) + 40;
+  const mine = kingdom.counties.filter((c) => c.owner === self);
+  if (mine.length === 0) return events;
+  const gold = mine.reduce((s, c) => s + c.income, 0) + 40;
 
-  // --- recrutamento: concentra nas fronteiras mais fracas; personalidades agressivas gastam mais ---
-  const borders = reds.filter((c) => isBorder(kingdom, c));
-  const pool = (borders.length ? borders : reds).slice().sort((a, b) => troopCount(a.troops) - troopCount(b.troops));
+  // recrutamento concentrado nas fronteiras mais fracas
+  const borders = mine.filter((c) => isBorder(kingdom, c));
+  const pool = (borders.length ? borders : mine).slice().sort((a, b) => troopCount(a.troops) - troopCount(b.troops));
   const budget = gold * Math.min(1, 0.65 + profile.aggression * 0.2);
   let spent = 0;
   for (const c of pool) {
@@ -69,25 +71,25 @@ export function runRivalTurn(kingdom: Kingdom, rng: Rng, profile: LordProfile, t
     if (spent >= budget) break;
   }
 
-  // --- consolidação: interior seguro reforça um vizinho de fronteira ---
-  for (const c of reds) {
+  // consolidação: interior seguro reforça um vizinho de fronteira
+  for (const c of mine) {
     if (c.moved || troopCount(c.troops) < 4 || isBorder(kingdom, c)) continue;
     const front = adjacency(kingdom.edges, c.id).map((n) => kingdom.counties[n])
-      .find((n) => n.owner === "red" && !n.moved && isBorder(kingdom, n));
+      .find((n) => n.owner === self && !n.moved && isBorder(kingdom, n));
     if (front) { moveHalf(c, front); c.moved = true; }
   }
 
-  // --- ataques com valorização de alvo ---
-  for (const c of reds) {
+  // ataques com valorização de alvo (exclui facções amigas)
+  for (const c of mine) {
     if (c.moved) continue;
     const cands = adjacency(kingdom.edges, c.id).map((n) => kingdom.counties[n])
-      .filter((n) => n.owner !== "red" && !(truceActive && n.owner === "blue"));
+      .filter((n) => n.owner !== self && !friendly.has(n.owner));
     if (!cands.length) continue;
 
     let best: County | null = null, bestScore = -Infinity;
     for (const t of cands) {
       const weakness = troopCount(c.troops) - troopCount(t.troops);
-      const value = t.prosperity / 50 + t.income / 10 + (t.owner === "blue" ? profile.targetsPlayer * 6 : 1);
+      const value = t.prosperity / 50 + t.income / 10 + (t.owner === "blue" ? profile.targetsPlayer * 6 : t.owner === "neutral" ? 1 : 2.5);
       const score = weakness * 0.5 + value;
       if (score > bestScore) { bestScore = score; best = t; }
     }
@@ -98,7 +100,7 @@ export function runRivalTurn(kingdom: Kingdom, rng: Rng, profile: LordProfile, t
       const res = autoResolve(c.troops, best.troops, { defenderFortified: best.owner !== "neutral" });
       if (res.winner === "attacker") {
         const wasBlue = best.owner === "blue";
-        best.owner = "red"; best.troops = res.attacker; c.troops = emptyTroops(); c.moved = true;
+        best.owner = self; best.troops = res.attacker; c.troops = emptyTroops(); c.moved = true;
         events.push({ text: `${wasBlue ? "⚠ " : ""}${profile.name} tomou ${best.name}${wasBlue ? " (seu condado!)" : ""}.`, kind: wasBlue ? "lose" : "info" });
       } else {
         c.troops = res.attacker; best.troops = res.defender; c.moved = true;
@@ -108,12 +110,13 @@ export function runRivalTurn(kingdom: Kingdom, rng: Rng, profile: LordProfile, t
   return events;
 }
 
-export type Victory = "blue" | "red" | null;
+export type Victory = "win" | "lose" | null;
 
+/** Vitória do jogador: domina todos os condados. Derrota: perde todos. */
 export function checkVictory(kingdom: Kingdom): Victory {
   const blue = kingdom.counties.filter((c) => c.owner === "blue").length;
-  if (blue === 0) return "red";
-  if (kingdom.counties.every((c) => c.owner === "blue")) return "blue";
+  if (blue === 0) return "lose";
+  if (kingdom.counties.every((c) => c.owner === "blue")) return "win";
   return null;
 }
 

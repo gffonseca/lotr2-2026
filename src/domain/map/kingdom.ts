@@ -59,6 +59,11 @@ export function createKingdom(rng: Rng): Kingdom {
   rival.troops = { sword: 4, pike: 3, archer: 3, knight: 1, mace: 1 };
   rival.pop = 18;
 
+  const rival2 = counties[9]; // Ironhold — segundo lorde rival
+  rival2.owner = "green";
+  rival2.troops = { sword: 4, pike: 3, archer: 2, knight: 1, mace: 1 };
+  rival2.pop = 18;
+
   for (const c of counties) {
     if (c.owner === "neutral") {
       c.troops = { sword: rng.int(1, 3), pike: rng.int(1, 3), archer: rng.int(0, 2), knight: 0, mace: 0 };

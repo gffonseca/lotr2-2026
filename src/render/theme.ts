@@ -17,10 +17,12 @@ export const THEME = {
 export const FACTION_COLOR: Record<string, number> = {
   blue: THEME.blue,
   red: THEME.red,
+  green: 0x5aa050,
   neutral: THEME.neutral,
 };
 export const FACTION_DARK: Record<string, number> = {
   blue: THEME.blueDark,
   red: THEME.redDark,
+  green: 0x2f6a2a,
   neutral: THEME.neutralDark,
 };

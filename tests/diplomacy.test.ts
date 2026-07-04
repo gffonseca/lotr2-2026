@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LORDS, evaluateTruce, truceCost, PERSONALITIES } from "@/domain";
+import { LORDS, evaluateTruce, evaluateAlliance, truceCost, allianceCost, demandFollowThrough, PERSONALITIES } from "@/domain";
 
 describe("diplomacia (Fase 3)", () => {
   it("Barão (agressivo) recusa tributo pequeno em força equilibrada", () => {
@@ -29,5 +29,24 @@ describe("diplomacia (Fase 3)", () => {
     expect(PERSONALITIES.length).toBe(4);
     const aggressions = PERSONALITIES.map((p) => LORDS[p].aggression);
     expect(new Set(aggressions).size).toBe(4);
+  });
+
+  it("aliança é mais difícil que trégua (mesma situação)", () => {
+    const offer = { tribute: 100, playerPower: 100, rivalPower: 100 };
+    // o Bispo aceita trégua fácil, mas a aliança é mais exigente
+    expect(evaluateTruce(LORDS.bishop, offer).accept).toBe(true);
+    expect(evaluateAlliance(LORDS.knight, offer).accept).toBe(false);
+  });
+
+  it("aliança aceita quando o jogador é muito mais forte", () => {
+    expect(evaluateAlliance(LORDS.bishop, { tribute: 0, playerPower: 400, rivalPower: 100 }).accept).toBe(true);
+  });
+
+  it("custo da aliança > custo da trégua", () => {
+    expect(allianceCost(200)).toBeGreaterThan(truceCost(200));
+  });
+
+  it("blefe: lorde agressivo cumpre a ameaça mais que o cauteloso", () => {
+    expect(demandFollowThrough(LORDS.baron)).toBeGreaterThan(demandFollowThrough(LORDS.bishop));
   });
 });

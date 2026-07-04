@@ -2,9 +2,9 @@
  * Persistência da campanha — serialização PURA (testável, sem localStorage).
  * O acesso ao storage fica no store; aqui só transformamos snapshot <-> JSON.
  */
-import type { County } from "@/domain";
+import type { County, AiFaction, Demand } from "@/domain";
 
-export const SAVE_VERSION = 3; // v3: diplomacia (personalidade do rival + trégua)
+export const SAVE_VERSION = 4; // v4: múltiplos lordes, relações e demandas
 export const SAVE_KEY = "lotr2-2026:campaign";
 
 export interface LogLineSnapshot { text: string; kind: "info" | "win" | "lose"; }
@@ -15,11 +15,13 @@ export interface CampaignSnapshot {
   year: number;
   counties: County[];
   selected: number | null;
-  winner: "blue" | "red" | null;
+  winner: "win" | "lose" | null;
   log: LogLineSnapshot[];
   rngState: number;
-  rivalPersonality: string;
-  truceTurns: number;
+  lords: Record<AiFaction, string>;
+  relations: Record<AiFaction, string>;
+  truceTurns: Record<AiFaction, number>;
+  pendingDemand: Demand | null;
 }
 
 export function serialize(snap: CampaignSnapshot): string {
@@ -34,6 +36,9 @@ export function deserialize(json: string): CampaignSnapshot | null {
     if (!Array.isArray(data.counties) || data.counties.length === 0) return null;
     if (typeof data.gold !== "number" || typeof data.year !== "number") return null;
     if (typeof data.rngState !== "number") return null;
+    const anyLords = data.lords as Record<AiFaction, string> | undefined;
+    const anyRel = data.relations as Record<AiFaction, string> | undefined;
+    const anyTruce = data.truceTurns as Record<AiFaction, number> | undefined;
     return {
       version: SAVE_VERSION,
       gold: data.gold,
@@ -43,8 +48,10 @@ export function deserialize(json: string): CampaignSnapshot | null {
       winner: data.winner ?? null,
       log: Array.isArray(data.log) ? (data.log as LogLineSnapshot[]) : [],
       rngState: data.rngState,
-      rivalPersonality: typeof data.rivalPersonality === "string" ? data.rivalPersonality : "knight",
-      truceTurns: typeof data.truceTurns === "number" ? data.truceTurns : 0,
+      lords: { red: anyLords?.red ?? "knight", green: anyLords?.green ?? "baron" },
+      relations: { red: anyRel?.red ?? "war", green: anyRel?.green ?? "war" },
+      truceTurns: { red: anyTruce?.red ?? 0, green: anyTruce?.green ?? 0 },
+      pendingDemand: (data.pendingDemand as Demand | null) ?? null,
     };
   } catch {
     return null;
