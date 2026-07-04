@@ -1,11 +1,13 @@
 /**
- * MapRenderer — desenha o reino (Pixi) a partir do store e traduz cliques
- * em ações do store. Não contém regras: só render + input.
+ * MapRenderer — reino ilustrado (Pixi): fundo texturizado, moldura de madeira,
+ * estradas inked e condados como medalhões heráldicos por facção.
+ * Regras ficam no store; aqui só render + input.
  */
 import { Container, Graphics, Text } from "pixi.js";
 import type { GameStore } from "@/state/store";
 import { troopCount } from "@/domain";
 import { FACTION_COLOR, FACTION_DARK, THEME } from "./theme";
+import { preloadTextures, tex } from "./textures";
 
 export class MapRenderer {
   readonly view = new Container();
@@ -25,7 +27,7 @@ export class MapRenderer {
     this.view.hitArea = { contains: () => true } as { contains: (x: number, y: number) => boolean };
     this.view.on("pointertap", (e) => {
       const p = this.view.toLocal(e.global);
-      const c = this.store.kingdom.counties.find((co) => Math.hypot(co.x - p.x, co.y - p.y) < 32);
+      const c = this.store.kingdom.counties.find((co) => Math.hypot(co.x - p.x, co.y - p.y) < 30);
       if (!c) return;
       const prevSel = this.store.selectedCounty;
       const result = this.store.clickCounty(c.id);
@@ -35,43 +37,74 @@ export class MapRenderer {
     this.view.on("pointermove", (e) => {
       if (!this.onHover) return;
       const p = this.view.toLocal(e.global);
-      const c = this.store.kingdom.counties.find((co) => Math.hypot(co.x - p.x, co.y - p.y) < 30);
+      const c = this.store.kingdom.counties.find((co) => Math.hypot(co.x - p.x, co.y - p.y) < 28);
       this.onHover(c ? c.id : null, e.global.x, e.global.y);
     });
     this.view.on("pointerleave", () => this.onHover?.(null, 0, 0));
+    void preloadTextures().then(() => this.redraw());
   }
 
   redraw(): void {
     const s = this.store;
     const g = this.gfx;
+    const W = this.width, H = this.height;
     g.clear();
     this.labels.removeChildren();
 
-    g.rect(0, 0, this.width, this.height).fill(0x1c2a12);
+    // --- fundo texturizado (campo) ---
+    const field = tex("mapfield");
+    if (field) g.rect(0, 0, W, H).fill({ texture: field }); else g.rect(0, 0, W, H).fill(0x3a4a24);
+    g.rect(0, 0, W, H).fill({ color: 0x24371a, alpha: 0.25 });
 
-    // estradas
+    // --- moldura decorativa (madeira + fio de ouro) ---
+    const wood = tex("wood");
+    g.rect(0, 0, W, 14).fill(wood ? { texture: wood } : { color: 0x2a1a0c });
+    g.rect(0, H - 14, W, 14).fill(wood ? { texture: wood } : { color: 0x2a1a0c });
+    g.rect(0, 0, 14, H).fill(wood ? { texture: wood } : { color: 0x2a1a0c });
+    g.rect(W - 14, 0, 14, H).fill(wood ? { texture: wood } : { color: 0x2a1a0c });
+    g.rect(15, 15, W - 30, H - 30).stroke({ width: 2, color: THEME.gold, alpha: 0.75 });
+
+    // --- estradas (inked: escura embaixo, clara em cima) ---
     for (const [u, v] of s.kingdom.edges) {
       const a = s.kingdom.counties[u], b = s.kingdom.counties[v];
       g.moveTo(a.x, a.y).lineTo(b.x, b.y);
     }
-    g.stroke({ width: 3, color: 0x6b5a3a, alpha: 0.8 });
+    g.stroke({ width: 6, color: 0x2c2313, alpha: 0.6 });
+    for (const [u, v] of s.kingdom.edges) {
+      const a = s.kingdom.counties[u], b = s.kingdom.counties[v];
+      g.moveTo(a.x, a.y).lineTo(b.x, b.y);
+    }
+    g.stroke({ width: 2.5, color: 0xb59b6a, alpha: 0.7 });
 
-    // destaque de vizinhos do selecionado
+    // --- vizinhos alcançáveis destacados ---
     if (s.selectedCounty != null) {
       for (const n of s.neighbors(s.selectedCounty)) {
         const c = s.kingdom.counties[n];
-        g.circle(c.x, c.y, 34).stroke({ width: 2, color: c.owner === "blue" ? THEME.green : THEME.gold });
+        g.circle(c.x, c.y, 34).stroke({ width: 2, color: c.owner === "blue" ? THEME.green : THEME.gold, alpha: 0.9 });
       }
     }
 
-    // condados
+    // --- condados: medalhões heráldicos ---
     for (const c of s.kingdom.counties) {
       const seld = s.selectedCounty === c.id;
-      g.circle(c.x, c.y, 28).fill(FACTION_COLOR[c.owner]).stroke({ width: seld ? 4 : 2, color: seld ? THEME.gold : FACTION_DARK[c.owner] });
-      this.label(c.name, c.x, c.y + 42, 12, THEME.ink);
-      this.label(`⚔ ${troopCount(c.troops)}`, c.x, c.y + 12, 12, 0xffffff, true);
-      this.label(c.owner === "neutral" ? "⌂" : "🏰", c.x, c.y - 4, 15, 0x0d0b07);
-      if (c.moved && c.owner === "blue") this.label("(moveu)", c.x, c.y - 38, 10, THEME.gold);
+      const col = FACTION_COLOR[c.owner], dark = FACTION_DARK[c.owner];
+      // sombra
+      g.circle(c.x + 2, c.y + 3, 27).fill({ color: 0x000000, alpha: 0.35 });
+      // aro dourado
+      g.circle(c.x, c.y, 27).fill(0x2a1c0e).stroke({ width: seld ? 4 : 3, color: seld ? 0xf0d18a : THEME.gold });
+      // brasão (facção) com leve degradê simulado
+      g.circle(c.x, c.y, 22).fill(col).stroke({ width: 2, color: dark });
+      g.circle(c.x - 5, c.y - 6, 12).fill({ color: 0xffffff, alpha: 0.12 });
+      // emblema + tropas
+      this.label(c.owner === "neutral" ? "⌂" : "♜", c.x, c.y - 4, 17, 0x120c06, true);
+      // faixa de tropas
+      g.roundRect(c.x - 16, c.y + 11, 32, 15, 4).fill(0x1c130a).stroke({ width: 1, color: THEME.gold });
+      this.label(`⚔ ${troopCount(c.troops)}`, c.x, c.y + 18, 11, 0xf0e2c0, true);
+      // nome em cartucho
+      const nameW = Math.max(52, c.name.length * 7);
+      g.roundRect(c.x - nameW / 2, c.y + 33, nameW, 16, 4).fill({ color: 0x1c130a, alpha: 0.82 });
+      this.label(c.name, c.x, c.y + 41, 12, 0xe9d8b0);
+      if (c.moved && c.owner === "blue") this.label("✓", c.x + 20, c.y - 20, 13, THEME.gold, true);
     }
   }
 

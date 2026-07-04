@@ -79,6 +79,7 @@ export class App {
       this.setText("bat-blue", String(c.blue));
       this.setText("bat-red", String(c.red));
       this.setText("bat-gate", c.gatePct + "%");
+      this.setText("bat-oil", String(this.battle.oilCharges()));
     }
   }
 
@@ -94,32 +95,58 @@ export class App {
   private buildHud(): void {
     this.hud.innerHTML = `
       <style>
-        .bar{pointer-events:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:linear-gradient(#2c2416,#231d14);border:1px solid #3d3320;border-radius:10px;padding:8px 12px;margin:8px}
-        .bar h1{font:16px Georgia;margin:0;color:#d9b25a}
-        .tab,.btn{font-family:Georgia;cursor:pointer;border-radius:8px;border:1px solid #3d3320;background:linear-gradient(#3a2f1c,#241d12);color:#efe4cf;padding:6px 11px;font-size:13px}
-        .tab.active,.btn.primary{background:linear-gradient(#6f5a22,#4a3a14);border-color:#d9b25a;font-weight:700}
-        .stat{background:#1c1710;border:1px solid #3d3320;border-radius:8px;padding:3px 9px;text-align:center;min-width:66px}
-        .stat .k{font-size:10px;color:#b9a888;text-transform:uppercase} .stat .v{font-size:15px;font-weight:700}
+        html,body{background:radial-gradient(1300px 780px at 50% -6%,#33240f,#160e06 68%) !important}
+        #hud{font-family:"Cinzel","Trajan Pro",Georgia,serif}
+        /* barras de madeira */
+        .bar{pointer-events:auto;display:flex;gap:8px;align-items:center;flex-wrap:nowrap;overflow-x:auto;
+          background:#2a1a0c url(/textures/wood.png);background-size:220px;border:3px solid #14100a;border-radius:10px;
+          padding:7px 12px;margin:8px;min-height:46px;
+          box-shadow:inset 0 0 0 2px #d9b25a55, inset 0 2px 10px #0008, 0 4px 14px #0009}
+        .bar h1{font-size:16px;margin:0;color:#f0d18a;text-shadow:0 1px 2px #000,0 0 8px #d9b25a55;letter-spacing:.5px;white-space:nowrap}
         .grow{flex:1}
-        .overlay{pointer-events:auto;position:fixed;inset:56px 8px 8px;overflow:auto}
-        .panel{background:#231d14;border:1px solid #3d3320;border-radius:10px;padding:12px;color:#efe4cf;max-width:820px;margin:0 auto}
-        .side{position:fixed;top:56px;right:8px;width:300px;pointer-events:auto}
-        .card{background:#231d14;border:1px solid #3d3320;border-radius:10px;padding:10px;color:#efe4cf;margin-bottom:8px;font:13px Georgia}
+        /* botões de latão */
+        .tab,.btn{cursor:pointer;border-radius:7px;border:2px solid #14100a;
+          background:linear-gradient(#4a3a1c,#2c2110);color:#f0e2c0;padding:6px 11px;font-size:13px;white-space:nowrap;
+          box-shadow:inset 0 1px 0 #d9b25a44,0 2px 4px #0007;text-shadow:0 1px 1px #000}
+        .tab:hover,.btn:hover{border-color:#d9b25a;color:#fff}
+        .tab.active,.btn.primary{background:linear-gradient(#8a6a24,#5a4212);border-color:#e8c774;color:#fff8e6;
+          box-shadow:inset 0 1px 0 #ffe9a8aa,0 2px 6px #0008}
+        /* pílulas de status */
+        .stat{background:linear-gradient(#241a0e,#160f07);border:2px solid #14100a;border-radius:8px;padding:3px 10px;text-align:center;min-width:66px;
+          box-shadow:inset 0 0 0 1px #d9b25a33}
+        .stat .k{font-size:10px;color:#c8a86a;text-transform:uppercase;letter-spacing:.5px}
+        .stat .v{font-size:15px;font-weight:700;color:#f2e6cc}
+        /* superfícies de pergaminho com moldura de madeira */
+        .card,.panel,.mcard,.modal .box{background:#e6d5ad url(/textures/parchment.png);background-size:cover;color:#2a1d0e;
+          border:9px solid #3a2712;border-image:url(/textures/wood.png) 26 stretch;border-radius:6px;
+          box-shadow:inset 0 0 0 2px #b8862b88, inset 0 0 24px #7a5a2e44, 0 6px 18px #000a}
+        .card h3,.panel h3{color:#6b3f14;font-weight:700;letter-spacing:.5px}
+        .card b,.panel b,.mcard h2{color:#5a3410}
+        .overlay{pointer-events:auto;position:fixed;inset:68px 10px 10px;overflow:auto}
+        .side{position:fixed;top:74px;right:10px;width:308px;pointer-events:auto}
+        .card{padding:10px;margin-bottom:10px;font-size:13px}
+        .panel{padding:14px;max-width:860px;margin:0 auto}
         .row{display:grid;grid-template-columns:80px 1fr 34px;gap:6px;align-items:center;margin:4px 0}
-        input[type=range]{width:100%;accent-color:#d9b25a}
-        .log{max-height:150px;overflow:auto;font-size:12px}
-        .win{color:#7fae54}.lose{color:#c8553a}.info{color:#b9a888}
-        .menu{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:900px;margin:30px auto}
-        .mcard{background:linear-gradient(#241d12,#1a150d);border:1px solid #3d3320;border-radius:12px;padding:22px;cursor:pointer;color:#efe4cf}
-        .mcard:hover{border-color:#d9b25a}.mcard h2{color:#d9b25a;font:20px Georgia;margin:8px 0 6px}.mcard .ico{font-size:38px}
-        .modal{pointer-events:auto;position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000a;z-index:30}
-        .modal .box{background:#2c2416;border:1px solid #d9b25a;border-radius:12px;padding:22px;text-align:center;color:#efe4cf}
-        table{width:100%;border-collapse:collapse}td{padding:2px 4px;border-bottom:1px solid #ffffff10}.n{text-align:right;font-weight:700}
-        #tooltip{pointer-events:none;position:fixed;z-index:40;background:#231d14f0;border:1px solid #d9b25a;border-radius:8px;padding:6px 9px;color:#efe4cf;font:12px Georgia;max-width:220px;line-height:1.4}
+        input[type=range]{width:100%;accent-color:#8a6a24}
+        .log{max-height:150px;overflow:auto;font-size:12px;color:#3a2c16}
+        .win{color:#3f6f1f;font-weight:700}.lose{color:#a3341f;font-weight:700}.info{color:#5c4a2c}
+        /* menu / título */
+        .menu{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:940px;margin:14px auto}
+        .mcard{padding:22px;cursor:pointer;transition:transform .12s}
+        .mcard:hover{transform:translateY(-3px)}
+        .mcard h2{font-size:21px;margin:8px 0 6px}.mcard .ico{font-size:40px}
+        .mcard p{color:#4a3a22;margin:0;font-size:13px}
+        /* modal / tooltip / toast */
+        .modal{pointer-events:auto;position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000b;z-index:30}
+        .modal .box{padding:24px 28px;text-align:center;max-width:430px}
+        .modal h3{color:#5a3410;margin:0 0 6px}
+        table{width:100%;border-collapse:collapse}td{padding:2px 4px;border-bottom:1px solid #6b4a2033}.n{text-align:right;font-weight:700;color:#3a2c16}
+        #tooltip{pointer-events:none;position:fixed;z-index:40;background:#e6d5ad url(/textures/parchment.png);background-size:cover;color:#2a1d0e;
+          border:6px solid #3a2712;border-image:url(/textures/wood.png) 20 stretch;padding:6px 9px;font-size:12px;max-width:236px;line-height:1.4;box-shadow:0 4px 12px #0009}
         #toasts{pointer-events:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:40;display:flex;flex-direction:column;gap:6px;align-items:center}
-        .toast{background:#2c2416;border:1px solid #d9b25a;border-radius:8px;padding:8px 14px;color:#efe4cf;font:13px Georgia;animation:tfade 2.4s forwards}
-        @keyframes tfade{0%{opacity:0;transform:translateY(8px)}10%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0}}
-        @media(max-width:860px){.side{position:static;width:auto;margin:8px}.overlay{inset:56px 4px 4px}.bar h1{font-size:13px}}
+        .toast{background:#2a1a0c url(/textures/wood.png);background-size:200px;border:2px solid #d9b25a;border-radius:8px;padding:8px 14px;color:#f0e2c0;font-size:13px;box-shadow:0 3px 10px #0009;animation:tfade 2.6s forwards}
+        @keyframes tfade{0%{opacity:0;transform:translateY(8px)}10%{opacity:1;transform:none}82%{opacity:1}100%{opacity:0}}
+        @media(max-width:860px){.side{position:static;width:auto;margin:8px}.overlay{inset:64px 4px 4px}.bar h1{font-size:13px}.menu{grid-template-columns:1fr}}
       </style>
       <div class="bar" id="nav">
         <h1>⚔️ LORDS OF THE REALM II · 2026</h1><div class="grow"></div>
@@ -131,6 +158,11 @@ export class App {
       </div>
 
       <div class="overlay" id="ov-menu">
+        <div style="text-align:center;padding:18px 0 2px">
+          <div style="font-size:13px;letter-spacing:5px;color:#c8a86a">⚜ ANNO · DOMINI · MMXXVI ⚜</div>
+          <div style="font-size:42px;color:#f0d18a;margin:6px 0 0;font-weight:700;text-shadow:0 2px 5px #000,0 0 16px #d9b25a55;letter-spacing:1px">LORDS OF THE REALM II</div>
+          <div style="font-size:14px;color:#c8b48c;font-style:italic;margin-top:2px">reino · economia · cerco · diplomacia</div>
+        </div>
         <div class="menu">
           <div class="mcard" data-go="county"><div class="ico">🌾</div><h2>Condado</h2><p>Economia sazonal: mão de obra, rebanhos, impostos.</p></div>
           <div class="mcard" data-go="battle"><div class="ico">⚔️</div><h2>Escaramuça</h2><p>Batalha em tempo real com counters e cerco.</p></div>
@@ -162,6 +194,8 @@ export class App {
         <div class="stat"><div class="k">Suas</div><div class="v" id="bat-blue" style="color:#4f7fd0">0</div></div>
         <div class="stat"><div class="k">Inimigo</div><div class="v" id="bat-red" style="color:#c8553a">0</div></div>
         <div class="stat"><div class="k">Portão</div><div class="v" id="bat-gate" style="color:#d9b25a">100%</div></div>
+        <div class="stat"><div class="k">🔥 Óleo</div><div class="v" id="bat-oil" style="color:#e0793c">0</div></div>
+        <span class="info" style="font-size:11px">Cerco: C catapulta · A aríete · S sapador · T torre</span>
         <div class="grow"></div>
         <span class="info" style="font-size:11px">Formação:</span>
         <button class="btn" data-form="line">Linha</button>

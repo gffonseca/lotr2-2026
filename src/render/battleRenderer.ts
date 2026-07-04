@@ -8,6 +8,7 @@ import { BattleSim, type BattleConfig } from "@/domain";
 import { UNITS } from "@/domain";
 import { THEME } from "./theme";
 import { preloadUnitSprites, unitTexture, unitFrames, unitDirFrames, facingToOctant, USE_DIRECTIONAL, type SpriteTeam } from "./sprites";
+import { preloadTextures, tex } from "./textures";
 import type { Sound } from "./sound";
 
 export type BattleEndCb = (win: boolean, attacker: ReturnType<BattleSim["survivors"]>, defender: ReturnType<BattleSim["survivors"]>) => void;
@@ -49,6 +50,7 @@ export class BattleRenderer {
     this.view.on("pointerup", (e: FederatedPointerEvent) => this.endDrag(e.shiftKey));
     this.view.on("pointerupoutside", () => this.endDrag(false));
     void preloadUnitSprites();
+    void preloadTextures();
   }
 
   start(config: BattleConfig, onEnd: BattleEndCb | null): void {
@@ -145,23 +147,34 @@ export class BattleRenderer {
     const sim = this.sim;
     this.bg.clear(); this.tokens.clear(); this.fg.clear(); this.glyphs.removeChildren();
 
-    this.bg.rect(0, 0, sim.width, sim.height).fill(0x233016);
+    const grass = tex("grass");
+    if (grass) this.bg.rect(0, 0, sim.width, sim.height).fill({ texture: grass }); else this.bg.rect(0, 0, sim.width, sim.height).fill(0x233016);
+    this.bg.rect(0, 0, sim.width, sim.height).fill({ color: 0x1c2a12, alpha: 0.18 });
 
     const gate = sim.gate;
     if (gate.maxHp > 1) {
-      this.bg.rect(sim.width - 158, 0, 16, sim.height).fill(0x6b6b73);
+      const stone = tex("stone");
+      const wx = sim.width - 158;
+      this.bg.rect(wx, 0, 16, sim.height).fill(stone ? { texture: stone } : { color: 0x6b6b73 }).stroke({ width: 1, color: 0x33333a });
+      for (let y = 4; y < sim.height; y += 26) {
+        this.bg.rect(wx - 4, y, 6, 12).fill(stone ? { texture: stone } : { color: 0x7a7a82 });
+        this.bg.rect(wx + 14, y, 6, 12).fill(stone ? { texture: stone } : { color: 0x7a7a82 });
+      }
       if (gate.hp > 0) {
-        this.bg.rect(gate.x - gate.w / 2, gate.y - gate.h / 2, gate.w, gate.h).fill(0x5a3d22);
+        const wood = tex("wood");
+        this.bg.rect(gate.x - gate.w / 2, gate.y - gate.h / 2, gate.w, gate.h).fill(wood ? { texture: wood } : { color: 0x5a3d22 }).stroke({ width: 2, color: 0x2a1c10 });
+        for (const fy of [gate.y - gate.h / 2 + 12, gate.y, gate.y + gate.h / 2 - 12]) this.bg.rect(gate.x - gate.w / 2, fy - 2, gate.w, 4).fill(0x2c2c30);
         const f = gate.hp / gate.maxHp;
-        this.fg.rect(gate.x - 30, gate.y - gate.h / 2 - 14, 60, 7).fill(0x000000);
-        this.fg.rect(gate.x - 29, gate.y - gate.h / 2 - 13, 58 * f, 5).fill(f > 0.4 ? THEME.gold : THEME.red);
+        this.fg.rect(gate.x - 30, gate.y - gate.h / 2 - 16, 60, 8).fill(0x1c130a).stroke({ width: 1, color: THEME.gold });
+        this.fg.rect(gate.x - 28, gate.y - gate.h / 2 - 14, 56 * f, 4).fill(f > 0.4 ? THEME.gold : THEME.red);
       }
     }
 
     // vãos (portão aberto + brechas) recortados na muralha, e máquinas de cerco
     if (gate.maxHp > 1) {
-      if (gate.hp <= 0) this.bg.rect(gate.x - 9, gate.y - gate.h / 2, 18, gate.h).fill(0x233016);
-      for (const b of sim.breaches) this.bg.rect(sim.width - 159, b.y - b.halfH, 18, b.halfH * 2).fill(0x233016);
+      const fillGap = grass ? { texture: grass } : { color: 0x233016 };
+      if (gate.hp <= 0) this.bg.rect(gate.x - 9, gate.y - gate.h / 2, 18, gate.h).fill(fillGap);
+      for (const b of sim.breaches) this.bg.rect(sim.width - 159, b.y - b.halfH, 18, b.halfH * 2).fill(fillGap);
     }
     for (const s of sim.sieges) {
       if (s.hp <= 0) continue;

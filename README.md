@@ -179,6 +179,7 @@ o escopo completo do jogo. Esta base (este repo) já cobre M0–M2.
 ## Roadmap de engenharia (além da Fase 1)
 
 - ✅ **Fase 2 — Combate de cerco:** catapultas (arco + área), aríete, sapadores (brechas), **torres de cerco** que cruzam a muralha, **óleo fervente** do defensor, **formações** (linha/coluna/cunha) e **pathfinding** até o vão. Animação de sprites **8-direcional** (mapeamento ajustável em `render/sprites.ts`).
+- ✅ **Identidade visual medieval:** texturas procedurais (pergaminho, madeira, pedra, grama), HUD/menu/painéis em pergaminho com moldura de madeira e fio de ouro, mapa ilustrado (fundo texturizado, moldura, estradas inked, condados como medalhões heráldicos), batalha com muralha de pedra + ameias e portão de madeira com ferragens.
 - ✅ **Fase 3 (primeira leva) — Diplomacia & IA:** lordes rivais com **personalidades** (Barão/Cavaleiro/Condessa/Bispo), **trégua** por tributo (aceitação conforme temperamento e força), e **IA estratégica** mais esperta (valorização de alvos, consolidação de tropas, ataque só com vantagem, respeito à trégua).
 - 🔶 **Fase 3 — IA e diplomacia (em curso):** feito personalidades (Cavaleiro/Condessa/Bispo/Barão), trégua por tributo e IA com valorização de alvos/consolidação; a fazer: alianças, blefe, múltiplos lordes no mapa.
 - **Fase 4 — Multiplayer assíncrono:** mover a simulação determinística para autoridade no servidor (Laravel/Node), turnos por partida, contas e saves na nuvem, replays a partir do log de comandos + seed.
