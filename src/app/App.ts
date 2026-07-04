@@ -60,9 +60,13 @@ export class App {
 
   private startBattle(): void {
     const pb = this.store.pendingBattle;
+    const seed = Date.now() >>> 0;
+    const siege = { catapults: 1, rams: 1, sappers: 1 };
     const cfg: BattleConfig = pb
-      ? { attacker: { ...pb.attacker }, defender: { ...pb.defender }, fortified: pb.fortified, width: BATTLE_W, height: BATTLE_H, seed: (Date.now() >>> 0) }
-      : { attacker: { sword: 5, pike: 5, archer: 5, knight: 3, mace: 3 }, defender: { sword: 4, pike: 5, archer: 6, knight: 2, mace: 2 }, fortified: true, width: BATTLE_W, height: BATTLE_H, seed: (Date.now() >>> 0) };
+      ? { attacker: { ...pb.attacker }, defender: { ...pb.defender }, fortified: pb.fortified, width: BATTLE_W, height: BATTLE_H, seed,
+          siege: pb.fortified ? siege : undefined, boilingOil: pb.fortified }
+      : { attacker: { sword: 5, pike: 5, archer: 5, knight: 3, mace: 3 }, defender: { sword: 4, pike: 5, archer: 6, knight: 2, mace: 2 }, fortified: true, width: BATTLE_W, height: BATTLE_H, seed,
+          siege, boilingOil: true };
     this.battle.start(cfg, pb
       ? (win, att, def) => this.store.finishBattle(win, att, def)
       : (win) => this.banner(win ? "⚔ Vitória!" : "☠ Derrota", win, () => this.show("battle")));
@@ -158,7 +162,10 @@ export class App {
         <div class="stat"><div class="k">Inimigo</div><div class="v" id="bat-red" style="color:#c8553a">0</div></div>
         <div class="stat"><div class="k">Portão</div><div class="v" id="bat-gate" style="color:#d9b25a">100%</div></div>
         <div class="grow"></div>
-        <span class="info" style="font-size:12px">Clique/arraste seleciona · botão direito move/ataca</span>
+        <span class="info" style="font-size:11px">Formação:</span>
+        <button class="btn" data-form="line">Linha</button>
+        <button class="btn" data-form="wedge">Cunha</button>
+        <button class="btn" data-form="column">Coluna</button>
         <button class="btn" id="bat-pause">⏸</button>
         <button class="btn primary" id="bat-restart">↺ Escaramuça</button>
       </div>
@@ -177,6 +184,8 @@ export class App {
     this.el("bat-pause").addEventListener("click", () => { this.battle.paused = !this.battle.paused; this.el("bat-pause").textContent = this.battle.paused ? "▶" : "⏸"; });
     this.el("bat-restart").addEventListener("click", () => { this.store.pendingBattle = null; this.startBattle(); });
     this.el("btn-mute").addEventListener("click", () => { const m = this.sound.toggleMute(); this.el("btn-mute").textContent = m ? "🔇" : "🔊"; });
+    this.hud.querySelectorAll("[data-form]").forEach((b) =>
+      (b as HTMLElement).addEventListener("click", () => this.battle.setFormation((b as HTMLElement).dataset.form as "grid" | "line" | "column" | "wedge")));
   }
 
   private hover(id: number | null, gx: number, gy: number): void {

@@ -178,7 +178,7 @@ o escopo completo do jogo. Esta base (este repo) já cobre M0–M2.
 
 ## Roadmap de engenharia (além da Fase 1)
 
-- **Fase 2 — Combate completo:** torres de cerco, catapultas, túneis, óleo fervente; formações; pathfinding.
+- ✅ **Fase 2 — Combate completo (primeira leva):** catapultas (arco + área), aríete, sapadores que abrem **brechas** na muralha, **óleo fervente** do defensor, **formações** (linha/coluna/cunha) e **pathfinding** até o vão. Animação de sprites **8-direcional** (mapeamento ajustável em `render/sprites.ts`).
 - **Fase 3 — IA e diplomacia:** IA estratégica (avaliação de fronteiras, blefe), personalidades (Cavaleiro/Condessa/Bispo/Barão), mensagens/gifts.
 - **Fase 4 — Multiplayer assíncrono:** mover a simulação determinística para autoridade no servidor (Laravel/Node), turnos por partida, contas e saves na nuvem, replays a partir do log de comandos + seed.
 - **Fase 5 — Conteúdo & meta:** editor de mapas, campanhas históricas, balanceamento data-driven, telemetria.

@@ -1,6 +1,10 @@
 node_modules/
 dist/
 dist-server/
+distbuild/
+b_*/
+build_*/
+*.timestamp-*.mjs
 *.log
 .DS_Store
 .env

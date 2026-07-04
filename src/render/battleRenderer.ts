@@ -7,7 +7,7 @@ import { AnimatedSprite, Container, Graphics, Sprite, Text, type FederatedPointe
 import { BattleSim, type BattleConfig } from "@/domain";
 import { UNITS } from "@/domain";
 import { THEME } from "./theme";
-import { preloadUnitSprites, unitTexture, unitFrames, type SpriteTeam } from "./sprites";
+import { preloadUnitSprites, unitTexture, unitFrames, unitDirFrames, facingToOctant, USE_DIRECTIONAL, type SpriteTeam } from "./sprites";
 import type { Sound } from "./sound";
 
 export type BattleEndCb = (win: boolean, attacker: ReturnType<BattleSim["survivors"]>, defender: ReturnType<BattleSim["survivors"]>) => void;
@@ -22,6 +22,7 @@ export class BattleRenderer {
   private glyphs = new Container();
   private fg = new Graphics();
   private unitSprites = new Map<number, Sprite>();
+  private spriteOctant = new Map<number, number>();
   private particles: Particle[] = [];
 
   private sim!: BattleSim;
@@ -63,11 +64,14 @@ export class BattleRenderer {
   private clearSprites(): void {
     for (const sp of this.unitSprites.values()) sp.destroy();
     this.unitSprites.clear();
+    this.spriteOctant.clear();
     this.unitLayer.removeChildren();
   }
 
   counts() { return this.sim.counts(); }
   get isOver() { return this.ended; }
+  setFormation(f: "grid" | "line" | "column" | "wedge"): void { this.sim?.setFormation(f); }
+  oilCharges(): number { return this.sim ? this.sim.oilCharges : 0; }
 
   private endDrag(additive: boolean): void {
     if (!this.drag) return;
@@ -116,6 +120,9 @@ export class BattleRenderer {
         case "death": this.spawn(e.x, e.y, 0xc0392b, 7); break;
         case "shot": this.sound?.play("arrow", 0.25); break;
         case "gate": this.spawn(e.x, e.y, THEME.gold, 3); this.sound?.play("gate", 0.4); break;
+        case "lob": this.sound?.play("arrow", 0.2); break;
+        case "breach": this.spawn(e.x, e.y, 0x8a8172, 14); this.sound?.play("gate", 0.5); break;
+        case "oil": this.spawn(e.x, e.y, 0xe0793c, 16); this.sound?.play("gate", 0.35); break;
       }
     }
   }
@@ -127,6 +134,11 @@ export class BattleRenderer {
   private updateParticles(dt: number): void {
     for (const p of this.particles) { p.life += dt; p.x += p.vx * dt; p.y += p.vy * dt; }
     this.particles = this.particles.filter((p) => p.life < p.max);
+  }
+
+  private sglyph(txt: string, x: number, y: number): void {
+    const t = new Text({ text: txt, style: { fill: 0xffffff, fontFamily: "Georgia", fontSize: 10, fontWeight: "bold" } });
+    t.anchor.set(0.5); t.x = x; t.y = y; this.glyphs.addChild(t);
   }
 
   private draw(): void {
@@ -146,19 +158,41 @@ export class BattleRenderer {
       }
     }
 
+    // vãos (portão aberto + brechas) recortados na muralha, e máquinas de cerco
+    if (gate.maxHp > 1) {
+      if (gate.hp <= 0) this.bg.rect(gate.x - 9, gate.y - gate.h / 2, 18, gate.h).fill(0x233016);
+      for (const b of sim.breaches) this.bg.rect(sim.width - 159, b.y - b.halfH, 18, b.halfH * 2).fill(0x233016);
+    }
+    for (const s of sim.sieges) {
+      if (s.hp <= 0) continue;
+      if (s.kind === "catapult") {
+        this.bg.rect(s.x - 12, s.y - 5, 24, 12).fill(0x6b4a2a).stroke({ width: 1, color: 0x2a1c10 });
+        this.bg.moveTo(s.x - 6, s.y).lineTo(s.x + 10, s.y - 14).stroke({ width: 3, color: 0x3a2a18 });
+        this.sglyph("C", s.x, s.y + 1);
+      } else if (s.kind === "ram") {
+        this.bg.rect(s.x - 16, s.y - 6, 32, 12).fill(0x5a3d22).stroke({ width: 1, color: 0x2a1c10 });
+        this.bg.circle(s.x + 16, s.y, 5).fill(0x9a9a9a);
+        this.sglyph("A", s.x - 2, s.y + 1);
+      } else {
+        this.bg.circle(s.x, s.y, 9).fill(0x7a6a4a).stroke({ width: 1, color: 0x2a1c10 });
+        this.sglyph("S", s.x, s.y + 1);
+      }
+    }
+
     const alive = new Set<number>();
     for (const u of sim.units) {
       if (u.hp <= 0) continue;
       alive.add(u.id);
       const T = UNITS[u.type];
       const team: SpriteTeam = u.team === "blue" ? "blue" : "red";
-      const sp = this.ensureSprite(u.id, team, u.type);
+      const r = this.ensureSprite(u.id, team, u.type, u.facing);
 
-      if (sp) {
-        const target = T.radius * 2.8;
-        const s = target / (sp.texture.height || target);
+      if (r) {
+        const sp = r.sp;
+        const targetH = T.radius * 2.8;
+        const s = targetH / (sp.texture.height || targetH);
         sp.scale.set(s, s);
-        sp.scale.x = Math.abs(s) * (Math.cos(u.facing) < 0 ? -1 : 1);
+        if (r.flip) sp.scale.x = Math.abs(s) * (Math.cos(u.facing) < 0 ? -1 : 1);
         sp.x = u.x; sp.y = u.y;
         sp.tint = u.routing ? 0x8a7a5a : 0xffffff;
         sp.visible = true;
@@ -175,7 +209,7 @@ export class BattleRenderer {
       this.fg.rect(u.x - 12, u.y - T.radius - 12, 24, 4).fill(0x000000);
       this.fg.rect(u.x - 11, u.y - T.radius - 11, 22 * f, 2).fill(f > 0.5 ? 0x8bc34a : f > 0.25 ? 0xe0a63c : 0xd9534f);
     }
-    for (const [id, sp] of this.unitSprites) if (!alive.has(id)) { sp.destroy(); this.unitSprites.delete(id); }
+    for (const [id, sp] of this.unitSprites) if (!alive.has(id)) { sp.destroy(); this.unitSprites.delete(id); this.spriteOctant.delete(id); }
 
     // partículas
     for (const p of this.particles) {
@@ -186,6 +220,8 @@ export class BattleRenderer {
     // projéteis
     for (const p of sim.projectiles) this.fg.moveTo(p.x, p.y).lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
     this.fg.stroke({ width: 2, color: 0xe8dcc0 });
+    // pedras de catapulta (arco)
+    for (const l of sim.lobs) this.fg.circle(l.x, l.y, 4).fill(0x8a8172);
 
     if (this.drag) {
       const d = this.drag;
@@ -193,14 +229,33 @@ export class BattleRenderer {
     }
   }
 
-  private ensureSprite(id: number, team: SpriteTeam, type: keyof typeof UNITS): Sprite | null {
+  private ensureSprite(id: number, team: SpriteTeam, type: keyof typeof UNITS, facing: number): { sp: Sprite; flip: boolean } | null {
+    // --- caminho direcional (8-dir): escolhe frames pela octante ---
+    if (USE_DIRECTIONAL) {
+      const oct = facingToOctant(facing);
+      const frames = unitDirFrames(team, type, oct);
+      if (frames && frames.length) {
+        let sp = this.unitSprites.get(id);
+        if (!sp) {
+          const anim = new AnimatedSprite(frames);
+          anim.animationSpeed = 0.1; anim.play();
+          anim.anchor.set(0.5, 0.6); this.unitLayer.addChild(anim);
+          this.unitSprites.set(id, anim); this.spriteOctant.set(id, oct);
+          return { sp: anim, flip: false };
+        }
+        if (sp instanceof AnimatedSprite && this.spriteOctant.get(id) !== oct) {
+          sp.textures = frames; sp.play(); this.spriteOctant.set(id, oct);
+        }
+        return { sp, flip: false };
+      }
+    }
+    // --- fallback: ciclo de walk + flip ---
     let sp = this.unitSprites.get(id);
-    if (sp) return sp;
+    if (sp) return { sp, flip: true };
     const frames = unitFrames(team, type);
     if (frames) {
       const anim = new AnimatedSprite(frames);
-      anim.animationSpeed = 0.12;
-      anim.play();
+      anim.animationSpeed = 0.12; anim.play();
       sp = anim;
     } else {
       const tex = unitTexture(team, type);
@@ -210,6 +265,6 @@ export class BattleRenderer {
     sp.anchor.set(0.5, 0.6);
     this.unitLayer.addChild(sp);
     this.unitSprites.set(id, sp);
-    return sp;
+    return { sp, flip: true };
   }
 }
